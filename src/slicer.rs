@@ -162,12 +162,12 @@ pub struct VhrdOwnedSlicerRaw<'a, const MTU: usize> {
     id: vhrdcan::FrameId,
 }
 #[cfg(feature = "vhrdcan")]
-impl<'a, const MTU: usize> Iterator for VhrdOwnedSlicerRaw<'a, MTU> {
+impl<'a> Iterator for VhrdOwnedSlicerRaw<'a, 8> {
     type Item = vhrdcan::RawFrame;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.slicer.next().map(|frame| {
-            vhrdcan::RawFrame::new(self.id, &frame.bytes).unwrap()
+            vhrdcan::RawFrame::new_move(self.id, frame.bytes, frame.used as u8).unwrap()
         })
     }
 }
@@ -179,12 +179,17 @@ pub struct VhrdOwnedSlicerPool<'a, 'b, const MTU: usize> {
     pool: &'b mut vhrdcan::FramePool
 }
 #[cfg(feature = "vhrdcan")]
-impl<'a, 'b, const MTU: usize> Iterator for VhrdOwnedSlicerPool<'a, 'b, MTU> {
+impl<'a, 'b> Iterator for VhrdOwnedSlicerPool<'a, 'b, 8> {
     type Item = vhrdcan::Frame;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.slicer.next().map(|frame| {
-            self.pool.new_frame(self.id, &frame.bytes).unwrap()
+            self.pool.new_frame_from_raw(
+                vhrdcan::RawFrame::new_move(
+                    self.id,
+                    frame.bytes,
+                    frame.used as u8
+                ).unwrap())
         })
     }
 }
