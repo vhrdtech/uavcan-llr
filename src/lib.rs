@@ -1,4 +1,6 @@
 #![cfg_attr(not(test), no_std)]
+#![feature(const_generics)]
+#![feature(const_evaluatable_checked)]
 #[deny(warnings)]
 
 pub mod types;

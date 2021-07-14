@@ -1,3 +1,5 @@
+#[deny(warnings)]
+
 use crate::types::TransferId;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]

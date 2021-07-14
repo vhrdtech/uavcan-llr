@@ -1,3 +1,5 @@
+#[deny(warnings)]
+
 use core::fmt::{Formatter, Display};
 use core::convert::TryFrom;
 use crate::Error;
