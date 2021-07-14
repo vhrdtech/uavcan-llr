@@ -134,6 +134,27 @@ impl TryFrom<u32> for CanId {
         })
     }
 }
+impl Into<u32> for CanId {
+    fn into(self) -> u32 {
+        let source_id = self.source_node_id.inner() as u32;
+        let priority = (self.priority as u32) << 26;
+        let bits26_7 = match self.transfer_kind {
+            TransferKind::Message(message) => {
+                let subject_id = (message.subject_id.inner() as u32) << 8;
+                let is_anonymous = (message.is_anonymous as u32) << 24;
+                subject_id | is_anonymous
+            }
+            TransferKind::Service(service) => {
+                let destination_id = (service.destination_node_id.inner() as u32) << 7;
+                let service_id = (service.service_id.inner() as u32) << 14;
+                let is_request = (service.is_request as u32) << 24;
+                let is_service = 1 << 25;
+                destination_id | service_id | is_request | is_service
+            }
+        };
+        priority | bits26_7 | source_id
+    }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TransferKind {

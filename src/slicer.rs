@@ -4,6 +4,7 @@ use crate::types::TransferId;
 use core::slice::Chunks;
 use crate::tailbyte::TailByteIter;
 use core::ops::Deref;
+use crate::types::CanId;
 
 pub struct Slicer<'a, const MTU: usize> {
     chunks: Chunks<'a, u8>,
@@ -136,11 +137,57 @@ impl<'a, const MTU: usize> Iterator for OwnedSlicer<'a, MTU> {
         }
     }
 }
-// impl<const MTU: usize> OwnedSlicer<MTU> {
-//     pub fn frames_vhrd(self) -> VhrdSlicer<MTU> {
-//
-//     }
-// }
+impl<'a, const MTU: usize> OwnedSlicer<'a, MTU> {
+    #[cfg(feature = "vhrdcan")]
+    pub fn vhrd_raw(self, id: CanId) -> VhrdOwnedSlicerRaw<'a, MTU> {
+        VhrdOwnedSlicerRaw {
+            slicer: self,
+            id: unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(id.into())) }
+        }
+    }
+
+    #[cfg(feature = "vhrdcan")]
+    pub fn vhrd_pool<'b>(self, pool: &'b mut vhrdcan::FramePool, id: CanId) -> VhrdOwnedSlicerPool<'a, 'b, MTU> {
+        VhrdOwnedSlicerPool {
+            slicer: self,
+            pool,
+            id: unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(id.into())) }
+        }
+    }
+}
+
+#[cfg(feature = "vhrdcan")]
+pub struct VhrdOwnedSlicerRaw<'a, const MTU: usize> {
+    slicer: OwnedSlicer<'a, MTU>,
+    id: vhrdcan::FrameId,
+}
+#[cfg(feature = "vhrdcan")]
+impl<'a, const MTU: usize> Iterator for VhrdOwnedSlicerRaw<'a, MTU> {
+    type Item = vhrdcan::RawFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.slicer.next().map(|frame| {
+            vhrdcan::RawFrame::new(self.id, &frame.bytes).unwrap()
+        })
+    }
+}
+
+#[cfg(feature = "vhrdcan")]
+pub struct VhrdOwnedSlicerPool<'a, 'b, const MTU: usize> {
+    slicer: OwnedSlicer<'a, MTU>,
+    id: vhrdcan::FrameId,
+    pool: &'b mut vhrdcan::FramePool
+}
+#[cfg(feature = "vhrdcan")]
+impl<'a, 'b, const MTU: usize> Iterator for VhrdOwnedSlicerPool<'a, 'b, MTU> {
+    type Item = vhrdcan::Frame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.slicer.next().map(|frame| {
+            self.pool.new_frame(self.id, &frame.bytes).unwrap()
+        })
+    }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct OwnedSlice<const N: usize> {

@@ -112,5 +112,16 @@ mod tests {
         }));
         assert_eq!(slicer.next(), None);
 
+        let payload = [0, 1, 2, 3, 4, 5, 6, 7];
+        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0000],
+            used: 8
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [7, 0x17, 0x8d, 0b0100_0000, 0, 0, 0, 0],
+            used: 4,
+        }));
+        assert_eq!(slicer.next(), None);
     }
 }
