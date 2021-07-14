@@ -19,7 +19,7 @@ mod tests {
     use crate::types::*;
     use crate::tailbyte::TailByte;
     use crate::Error;
-    use crate::slicer::Slicer;
+    use crate::slicer::{Slicer, OwnedSlice, frame_count};
 
     #[test]
     fn check_ids() {
@@ -85,20 +85,32 @@ mod tests {
 
     #[test]
     fn check_frame_count() {
-        assert_eq!(Slicer::frame_count(0, 8), 1);
-        assert_eq!(Slicer::frame_count(1, 8), 1);
-        assert_eq!(Slicer::frame_count(6, 8), 1);
-        assert_eq!(Slicer::frame_count(7, 8), 1);
+        assert_eq!(frame_count(0, 8), 1);
+        assert_eq!(frame_count(1, 8), 1);
+        assert_eq!(frame_count(6, 8), 1);
+        assert_eq!(frame_count(7, 8), 1);
 
-        assert_eq!(Slicer::frame_count(8, 8), 2);  // 7+t 1+crc+t
-        assert_eq!(Slicer::frame_count(12, 8), 2); // 7+t 5+crc+t
+        assert_eq!(frame_count(8, 8), 2);  // 7+t 1+crc+t
+        assert_eq!(frame_count(12, 8), 2); // 7+t 5+crc+t
 
-        assert_eq!(Slicer::frame_count(13, 8), 3); // 7+t 6+cr+t c+t
-        assert_eq!(Slicer::frame_count(14, 8), 3); // 7+t 7+t 2+t
-        assert_eq!(Slicer::frame_count(19, 8), 3); // 7+t 7+t 5+crc+t
+        assert_eq!(frame_count(13, 8), 3); // 7+t 6+cr+t c+t
+        assert_eq!(frame_count(14, 8), 3); // 7+t 7+t 2+t
+        assert_eq!(frame_count(19, 8), 3); // 7+t 7+t 5+crc+t
 
-        assert_eq!(Slicer::frame_count(20, 8), 4); // 7+t 7+t 6+cr+t c+t
-        assert_eq!(Slicer::frame_count(21, 8), 4); // 7+t 7+t 7+t crc+t
-        assert_eq!(Slicer::frame_count(26, 8), 4); // 7+t 7+t 7+t 5+crc+t
+        assert_eq!(frame_count(20, 8), 4); // 7+t 7+t 6+cr+t c+t
+        assert_eq!(frame_count(21, 8), 4); // 7+t 7+t 7+t crc+t
+        assert_eq!(frame_count(26, 8), 4); // 7+t 7+t 7+t 5+crc+t
+    }
+
+    #[test]
+    fn check_slicer() {
+        let payload = [0, 1, 2, 3, 4, 5, 6];
+        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0, 1, 2, 3, 4, 5, 6, 0b1110_0000],
+            used: 8
+        }));
+        assert_eq!(slicer.next(), None);
+
     }
 }
