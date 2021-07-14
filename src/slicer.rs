@@ -41,6 +41,18 @@ impl<'a, 'b> Slicer<'a> {
         }
     }
 
+    pub fn frames_ref(self) -> RefSlicer<'a> {
+        RefSlicer {
+            slicer: self
+        }
+    }
+
+    pub fn frames_owned<const N: usize>(self) -> OwnedSlicer<'a, N> {
+        OwnedSlicer {
+            slicer: self.frames_ref()
+        }
+    }
+
     pub fn frame_count(payload_len: usize, mtu: usize) -> usize {
         if payload_len <= 7 {
             1
@@ -51,48 +63,52 @@ impl<'a, 'b> Slicer<'a> {
     }
 }
 
-impl<'a> Iterator for Slicer<'a> {
-    type Item = (&'a [u8], OwnedSlice);
+pub struct RefSlicer<'a> {
+    slicer: Slicer<'a>
+}
+
+impl<'a> Iterator for RefSlicer<'a> {
+    type Item = (&'a [u8], OwnedSlice<3>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.tail_bytes.next() {
+        match self.slicer.tail_bytes.next() {
             Some(tail_byte) => {
                 let tail_byte = tail_byte.as_byte();
-                match self.chunks.next() {
+                match self.slicer.chunks.next() {
                     Some(chunk) => {
-                        if chunk.len() <= self.max_chunk_len - 2 { // mtu8: len() <= 5 (2 byte crc and tail byte will fit)
-                            if self.crc_bytes_left == 2 {
-                                self.crc_bytes_left -= 2;
-                                Some((chunk, OwnedSlice::new([self.crc[0], self.crc[1], tail_byte])))
-                            } else if self.crc_bytes_left == 1 {
-                                self.crc_bytes_left -= 1;
-                                Some((chunk, OwnedSlice::new_two(self.crc[1], tail_byte)))
+                        if chunk.len() <= self.slicer.max_chunk_len - 2 { // mtu8: len() <= 5 (2 byte crc and tail byte will fit)
+                            if self.slicer.crc_bytes_left == 2 {
+                                self.slicer.crc_bytes_left -= 2;
+                                Some((chunk, OwnedSlice::new_three(self.slicer.crc[0], self.slicer.crc[1], tail_byte)))
+                            } else if self.slicer.crc_bytes_left == 1 {
+                                self.slicer.crc_bytes_left -= 1;
+                                Some((chunk, OwnedSlice::new_two(self.slicer.crc[1], tail_byte)))
                             } else { // can only be 2 or 1 bytes of crc left for transmission
                                 unreachable!()
                             }
-                        } else if chunk.len() == self.max_chunk_len - 1 { // mtu8: len() == 6 (1 byte of crc and tail byte will fit)
-                            if self.crc_bytes_left == 2 {
-                                self.crc_bytes_left -= 1;
-                                Some((chunk, OwnedSlice::new_two(self.crc[0], tail_byte)))
-                            } else if self.crc_bytes_left == 1 {
-                                self.crc_bytes_left -= 1;
-                                Some((chunk, OwnedSlice::new_two(self.crc[1], tail_byte)))
+                        } else if chunk.len() == self.slicer.max_chunk_len - 1 { // mtu8: len() == 6 (1 byte of crc and tail byte will fit)
+                            if self.slicer.crc_bytes_left == 2 {
+                                self.slicer.crc_bytes_left -= 1;
+                                Some((chunk, OwnedSlice::new_two(self.slicer.crc[0], tail_byte)))
+                            } else if self.slicer.crc_bytes_left == 1 {
+                                self.slicer.crc_bytes_left -= 1;
+                                Some((chunk, OwnedSlice::new_two(self.slicer.crc[1], tail_byte)))
                             } else { // can only be 2 or 1 bytes of crc left for transmission
                                 unreachable!()
                             }
-                        } else if chunk.len() == self.max_chunk_len { // mtu8: len() == 7 (only tail byte will fit), single frame transfer or full frames from multi frame
+                        } else if chunk.len() == self.slicer.max_chunk_len { // mtu8: len() == 7 (only tail byte will fit), single frame transfer or full frames from multi frame
                             Some((chunk, OwnedSlice::new_one(tail_byte)))
                         } else { // size should be <= max_chunk_len=mtu-1 since we chunk input payload that way
                             unreachable!()
                         }
                     },
                     None => {
-                        if self.crc_bytes_left == 2 {
-                            self.crc_bytes_left -= 2;
-                            Some((&[], OwnedSlice::new([self.crc[0], self.crc[1], tail_byte])))
-                        } else if self.crc_bytes_left == 1 {
-                            self.crc_bytes_left -= 1;
-                            Some((&[], OwnedSlice::new_two(self.crc[1], tail_byte)))
+                        if self.slicer.crc_bytes_left == 2 {
+                            self.slicer.crc_bytes_left -= 2;
+                            Some((&[], OwnedSlice::new_three(self.slicer.crc[0], self.slicer.crc[1], tail_byte)))
+                        } else if self.slicer.crc_bytes_left == 1 {
+                            self.slicer.crc_bytes_left -= 1;
+                            Some((&[], OwnedSlice::new_two(self.slicer.crc[1], tail_byte)))
                         } else { // can only be 2 or 1 bytes of crc left for transmission
                             unreachable!()
                         }
@@ -104,34 +120,73 @@ impl<'a> Iterator for Slicer<'a> {
     }
 }
 
-pub struct OwnedSlice {
-    bytes: [u8; 3],
-    used: u8,
+pub struct OwnedSlicer<'a, const MTU: usize> {
+    slicer: RefSlicer<'a>
 }
-impl OwnedSlice {
+impl<'a, const MTU: usize> Iterator for OwnedSlicer<'a, MTU> {
+    type Item = OwnedSlice<MTU>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.slicer.next() {
+            Some((a, b)) => {
+                let mut frame = [0u8; MTU];
+                frame.copy_from_slice(a);
+                frame[a.len()..a.len() + b.len()].copy_from_slice(&b);
+                Some(OwnedSlice::new(frame, a.len() + b.len()))
+            },
+            None => None
+        }
+    }
+}
+// impl<const MTU: usize> OwnedSlicer<MTU> {
+//     pub fn frames_vhrd(self) -> VhrdSlicer<MTU> {
+//
+//     }
+// }
+
+pub struct OwnedSlice<const N: usize> {
+    bytes: [u8; N],
+    used: usize,
+}
+impl<const N: usize> OwnedSlice<N> {
     pub fn new_one(byte: u8) -> Self {
+        let mut bytes = [0u8; N];
+        bytes[0] = byte;
         OwnedSlice {
-            bytes: [byte, 0, 0],
+            bytes,
             used: 1
         }
     }
     pub fn new_two(byte0: u8, byte1: u8) -> Self {
+        let mut bytes = [0u8; N];
+        bytes[0] = byte0;
+        bytes[1] = byte1;
         OwnedSlice {
-            bytes: [byte0, byte1, 0],
+            bytes,
             used: 2
         }
     }
-    pub fn new(bytes: [u8; 3]) -> Self {
+    pub fn new_three(byte0: u8, byte1: u8, byte2: u8) -> Self {
+        let mut bytes = [0u8; N];
+        bytes[0] = byte0;
+        bytes[1] = byte1;
+        bytes[2] = byte2;
         OwnedSlice {
             bytes,
             used: 3
         }
     }
+    pub fn new(bytes: [u8; N], used: usize) -> Self {
+        OwnedSlice {
+            bytes, used
+        }
+    }
 }
-impl Deref for OwnedSlice {
+impl<const N: usize> Deref for OwnedSlice<N> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.bytes[0..self.used as usize]
+        &self.bytes[0..self.used]
     }
 }
+
