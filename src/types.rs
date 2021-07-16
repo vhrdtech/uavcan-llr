@@ -3,6 +3,7 @@
 use core::fmt::{Formatter, Display};
 use core::convert::TryFrom;
 use crate::Error;
+use core::cmp::Ordering;
 
 macro_rules! max_bound_number {
     ($type_name: ident, $base_type: ty, $max: literal) => {
@@ -208,5 +209,15 @@ impl Display for Priority {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let c = r#"EIFHNLSO"#;
         write!(f, "{}", c.chars().nth(*self as usize).unwrap())
+    }
+}
+impl PartialOrd for Priority {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Priority {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (*self as u8).cmp(&(*other as u8)).reverse()
     }
 }

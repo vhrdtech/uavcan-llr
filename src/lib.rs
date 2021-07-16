@@ -1,7 +1,9 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(const_generics)]
 #![feature(const_evaluatable_checked)]
+#![allow(incomplete_features)]
 #[deny(warnings)]
+
 
 pub mod types;
 pub mod slicer;
@@ -31,6 +33,11 @@ mod tests {
         assert!(SubjectId::new(8192).is_none());
         assert!(ServiceId::new(10).is_some());
         assert!(ServiceId::new(512).is_none());
+    }
+
+    #[test]
+    fn check_priority() {
+        assert!(Priority::Low < Priority::High);
     }
 
     #[test]
