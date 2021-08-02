@@ -1,5 +1,4 @@
 use crate::types::{CanId, Priority, TransferId};
-use core::convert::TryFrom;
 use crate::tailbyte::TailByte;
 
 /// Used to index array of transfer pieces (incoming frames + index of the next piece)

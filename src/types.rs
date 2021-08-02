@@ -4,6 +4,7 @@ use core::fmt::{Formatter, Display};
 use core::convert::TryFrom;
 use crate::Error;
 use core::cmp::Ordering;
+use vhrdcan::FrameId;
 
 macro_rules! max_bound_number {
     ($type_name: ident, $base_type: ty, $max: literal) => {
@@ -41,6 +42,12 @@ impl TransferId {
         } else {
             self.0 += 1;
         }
+    }
+}
+
+impl Default for TransferId {
+    fn default() -> Self {
+        TransferId(0)
     }
 }
 
@@ -156,6 +163,12 @@ impl Into<u32> for CanId {
             }
         };
         priority | bits26_7 | source_id
+    }
+}
+#[cfg(feature = "vhrdcan")]
+impl Into<vhrdcan::FrameId> for CanId {
+    fn into(self) -> FrameId {
+        unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(self.into())) }
     }
 }
 

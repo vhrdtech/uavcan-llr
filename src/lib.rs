@@ -7,7 +7,7 @@
 
 pub mod types;
 pub mod slicer;
-pub mod assembler;
+// pub mod assembler;
 pub mod tailbyte;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
