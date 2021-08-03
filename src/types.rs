@@ -1,10 +1,9 @@
 #[deny(warnings)]
 
 use core::fmt::{Formatter, Display};
-use core::convert::TryFrom;
+use core::convert::{TryFrom};
 use crate::Error;
 use core::cmp::Ordering;
-use vhrdcan::FrameId;
 
 macro_rules! max_bound_number {
     ($type_name: ident, $base_type: ty, $max: literal) => {
@@ -167,8 +166,20 @@ impl Into<u32> for CanId {
 }
 #[cfg(feature = "vhrdcan")]
 impl Into<vhrdcan::FrameId> for CanId {
-    fn into(self) -> FrameId {
+    fn into(self) -> vhrdcan::FrameId {
         unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(self.into())) }
+    }
+}
+#[cfg(feature = "vhrdcan")]
+impl TryFrom<vhrdcan::FrameId> for CanId {
+    type Error = ();
+
+    fn try_from(frame_id: vhrdcan::FrameId) -> Result<Self, Self::Error> {
+        use vhrdcan::FrameId;
+        match frame_id {
+            FrameId::Standard(_) => Err(()),
+            FrameId::Extended(eid) => CanId::try_from(eid.id()).map_err(|_| ())
+        }
     }
 }
 
