@@ -172,13 +172,13 @@ impl Into<vhrdcan::FrameId> for CanId {
 }
 #[cfg(feature = "vhrdcan")]
 impl TryFrom<vhrdcan::FrameId> for CanId {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(frame_id: vhrdcan::FrameId) -> Result<Self, Self::Error> {
         use vhrdcan::FrameId;
         match frame_id {
-            FrameId::Standard(_) => Err(()),
-            FrameId::Extended(eid) => CanId::try_from(eid.id()).map_err(|_| ())
+            FrameId::Standard(_) => Err(Error::StandardIdNotSupported),
+            FrameId::Extended(eid) => CanId::try_from(eid.id())
         }
     }
 }

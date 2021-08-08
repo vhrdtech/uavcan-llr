@@ -14,6 +14,8 @@ pub mod tailbyte;
 pub enum Error {
     WrongReservedBit,
     NoneZeroHighBits,
+    #[cfg(feature = "vhrdcan")]
+    StandardIdNotSupported,
 }
 
 #[cfg(test)]
