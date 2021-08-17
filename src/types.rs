@@ -182,6 +182,16 @@ impl TryFrom<vhrdcan::FrameId> for CanId {
         }
     }
 }
+// impl Ord for CanId {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.priority.cmp(&other.priority)
+//     }
+// }
+// impl PartialOrd for CanId {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TransferKind {
