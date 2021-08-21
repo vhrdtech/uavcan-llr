@@ -58,18 +58,19 @@ impl<const MTU: usize, const MAX_PIECES: usize, const MAX_TRANSFERS: usize> Asse
                                 // no empty slots, destroy some lower priority transfer and free up
                                 loop {
                                     match self.find_lower_priority_transfer(id.priority) {
-                                        Some(lower_i) => {
-                                            let lp_transfer = self.transfers.get(lower_i as usize).unwrap().clone();
+                                        Some(lp_transfer) => {
                                             match lp_transfer {
                                                 Transfer::Empty => {
                                                     unreachable!()
                                                 }
-                                                Transfer::Assembling(_, t) => {
-                                                    self.remove_pieces(t.first_piece);
+                                                Transfer::Assembling(_, ta) => {
+                                                    self.remove_pieces(ta.first_piece);
+                                                    self.counters.destroyed_other_assembling += 1;
                                                     break;
                                                 }
-                                                Transfer::Done(_, first_piece) => {
-                                                    self.remove_pieces(t.first_piece);
+                                                Transfer::Done(_, td) => {
+                                                    self.remove_pieces(td.first_piece);
+                                                    self.counters.destroyed_while_done += 1;
                                                     break;
                                                 }
                                                 Transfer::Error(_) => {
@@ -82,6 +83,7 @@ impl<const MTU: usize, const MAX_PIECES: usize, const MAX_TRANSFERS: usize> Asse
                                             // no space left and no other transfers can be replaced, this frame and whole transfer will be lost
                                             self.remove_transfer(i);
                                             self.remove_pieces(t.first_piece);
+                                            self.counters.destroyed_self_assembling += 1;
                                             return;
                                         }
                                     }
@@ -108,6 +110,10 @@ impl<const MTU: usize, const MAX_PIECES: usize, const MAX_TRANSFERS: usize> Asse
         }
     }
 
+    fn get_transfer(&self, idx: TransferIdx) -> &mut Transfer {
+        self.transfers.as_ptr()
+    }
+
     fn find_transfer_by_id(&self, id: CanId) -> Option<TransferIdx> {
         use Transfer::*;
         for (i, t) in self.transfers.iter().enumerate() {
@@ -123,14 +129,14 @@ impl<const MTU: usize, const MAX_PIECES: usize, const MAX_TRANSFERS: usize> Asse
         None
     }
 
-    fn find_lower_priority_transfer(&self, lower_than: Priority) -> Option<TransferIdx> {
+    fn find_lower_priority_transfer(&self, lower_than: Priority) -> Option<&Transfer> {
         use Transfer::*;
         for (i, t) in self.transfers.iter().enumerate() {
             match t {
                 Empty => {},
                 Assembling(id, _) | Done(id, _) | Error(id) => {
                     if id.priority < lower_than {
-                        return Some(i as TransferIdx);
+                        return Some(unsafe { self.transfers.get_unchecked(i) });
                     }
                 }
             }
@@ -287,6 +293,9 @@ struct TransferDone {
 pub struct Counters {
     /// Incremented if a frame is received that belongs to a transfer already reassembled
     pub duplicate_frames: u32,
+    pub destroyed_other_assembling: u32,
+    pub destroyed_other_done: u32,
+    pub destroyed_self_assembling: u32,
 
     pub pop_got_empty_piece: u32,
 }
