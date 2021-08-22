@@ -178,7 +178,7 @@ impl TryFrom<vhrdcan::FrameId> for CanId {
         use vhrdcan::FrameId;
         match frame_id {
             FrameId::Standard(_) => Err(Error::StandardIdNotSupported),
-            FrameId::Extended(eid) => CanId::try_from(eid.id())
+            FrameId::Extended(eid) => CanId::try_from(eid.inner())
         }
     }
 }

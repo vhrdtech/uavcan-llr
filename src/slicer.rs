@@ -244,6 +244,18 @@ impl<const N: usize> OwnedSlice<N> {
             bytes, used
         }
     }
+    pub fn from_slice(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() <= N {
+            let mut bytes_copy = [0u8; N];
+            bytes_copy[0..bytes.len()].copy_from_slice(bytes);
+            Some(OwnedSlice {
+                bytes: bytes_copy,
+                used: bytes.len()
+            })
+        } else {
+            None
+        }
+    }
 }
 impl<const N: usize> Deref for OwnedSlice<N> {
     type Target = [u8];
