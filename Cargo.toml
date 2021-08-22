@@ -7,4 +7,4 @@ edition = "2018"
 
 [dependencies]
 crc-any = { version = "2.3", default-features = false }
-vhrdcan = { version = "0.1.0", path = "../vhrdcan", optional = true }
+vhrdcan = { git = "https://github.com/vhrdtech/vhrdcan.git", optional = true }
