@@ -7,7 +7,7 @@
 
 pub mod types;
 pub mod slicer;
-// pub mod assembler;
+pub mod assembler;
 pub mod tailbyte;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -137,15 +137,15 @@ mod tests {
         assert_eq!(slicer.next(), None);
     }
 
-    // #[test]
-    // fn check_assembler() {
-    //     let payload = [0, 1, 2, 3, 4, 5, 6];
-    //     let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
-    //     let transfer_bytes = slicer.next().unwrap();
-    //
-    //     let mut assembler = Assembler::<8, 128, 8>::new();
-    //     let id = CanId::new_message_kind(NodeId::new(0).unwrap(), SubjectId::new(0).unwrap(), false, Priority::Nominal);
-    //     assembler.eat(id, &transfer_bytes);
-    //
-    // }
+    #[test]
+    fn check_assembler() {
+        let payload = [0, 1, 2, 3, 4, 5, 6];
+        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        let transfer_bytes = slicer.next().unwrap();
+
+        // let mut assembler = Assembler::<8, 128, 8>::new();
+        // let id = CanId::new_message_kind(NodeId::new(0).unwrap(), SubjectId::new(0).unwrap(), false, Priority::Nominal);
+        // assembler.eat(id, &transfer_bytes);
+
+    }
 }
