@@ -4,7 +4,6 @@ use crate::types::TransferId;
 use core::slice::Chunks;
 use crate::tailbyte::TailByteIter;
 use core::ops::Deref;
-use crate::types::CanId;
 
 pub struct Slicer<'a, const MTU: usize> {
     chunks: Chunks<'a, u8>,
@@ -41,7 +40,7 @@ impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
     }
 
     #[cfg(feature = "vhrdcan")]
-    pub fn new_single(payload: OwnedSlice<{MTU - 1}>, can_id: CanId, transfer_id: &mut TransferId) -> vhrdcan::Frame<MTU> {
+    pub fn new_single(payload: OwnedSlice<{MTU - 1}>, can_id: crate::types::CanId, transfer_id: &mut TransferId) -> vhrdcan::Frame<MTU> {
         let tail_byte = crate::tailbyte::TailByte::single_frame_transfer(*transfer_id);
         transfer_id.increment();
         let mut frame_bytes = [0u8; MTU];
@@ -151,7 +150,7 @@ impl<'a, const MTU: usize> Iterator for OwnedSlicer<'a, MTU> {
 }
 impl<'a, const MTU: usize> OwnedSlicer<'a, MTU> {
     #[cfg(feature = "vhrdcan")]
-    pub fn vhrd_raw(self, id: CanId) -> VhrdOwnedSlicerRaw<'a, MTU> {
+    pub fn vhrd_raw(self, id: crate::types::CanId) -> VhrdOwnedSlicerRaw<'a, MTU> {
         VhrdOwnedSlicerRaw {
             slicer: self,
             id: unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(id.into())) }

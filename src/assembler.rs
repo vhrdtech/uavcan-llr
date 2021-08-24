@@ -1,5 +1,26 @@
+/// Used to index array of transfer pieces (incoming frames + index of the next piece)
+type PieceIdx = u16;
+/// Used to index into frame data
+type PieceByteIdx = u8;
+/// Used to index into transfer list
+type TransferIdx = u8;
+/// Used to sort incoming transfer by time of arrival, so that equal priority transfer are in fifo order
+/// Must be able to hold 2 * MAX_TRANSFERS
+type TransferSeq = i16;
+
 struct TransferMachine<S> {
-    state: S
+    state: S,
+    first_piece: PieceIdx,
+    last_piece_bytes_used: PieceByteIdx,
+}
+impl<S> TransferMachine<S> {
+    pub fn into_state<NS>(self, new_state: NS) -> TransferMachine<NS> {
+        TransferMachine {
+            state: new_state,
+            first_piece: self.first_piece,
+            last_piece_bytes_used: self.last_piece_bytes_used
+        }
+    }
 }
 
 struct Empty {
@@ -23,13 +44,13 @@ struct Failure {
 }
 
 impl From<TransferMachine<Empty>> for TransferMachine<AssemblingT1> {
-    fn from(_: TransferMachine<Empty>) -> TransferMachine<Assembling> {
+    fn from(_: TransferMachine<Empty>) -> TransferMachine<AssemblingT1> {
         todo!()
     }
 }
 impl From<TransferMachine<Empty>> for TransferMachine<Done> {
-    fn from(_: TransferMachine<Empty>) -> TransferMachine<Done> {
-        todo!()
+    fn from(v: TransferMachine<Empty>) -> TransferMachine<Done> {
+        v.into_state(Done {})
     }
 }
 impl From<TransferMachine<Empty>> for TransferMachine<Failure> {
@@ -61,12 +82,12 @@ impl From<TransferMachine<AssemblingT0>> for TransferMachine<Done> {
 }
 
 impl From<TransferMachine<AssemblingT1>> for TransferMachine<Failure> {
-    fn from(_: TransferMachine<AssemblingT1>) -> TransferMachine<Done> {
+    fn from(_: TransferMachine<AssemblingT1>) -> TransferMachine<Failure> {
         todo!()
     }
 }
 impl From<TransferMachine<AssemblingT0>> for TransferMachine<Failure> {
-    fn from(_: TransferMachine<AssemblingT0>) -> TransferMachine<Done> {
+    fn from(_: TransferMachine<AssemblingT0>) -> TransferMachine<Failure> {
         todo!()
     }
 }
