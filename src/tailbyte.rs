@@ -9,6 +9,16 @@ pub struct TailByte {
     pub toggle_bit: bool,
     pub id: TransferId,
 }
+pub enum Kind {
+    SingleFrame,
+    SingleFrameV0,
+    Start,
+    StartV0,
+    MiddleT1,
+    MiddleT0,
+    EndT1,
+    EndT0,
+}
 impl TailByte {
     pub fn single_frame_transfer(id: TransferId) -> TailByte {
         TailByte {
@@ -37,6 +47,10 @@ impl TailByte {
         ((self.end_of_transfer as u8) << 6) |
         ((self.toggle_bit as u8) << 5) |
         self.id.inner()
+    }
+
+    pub fn kind(&self) -> Kind {
+        Kind::EndT0
     }
 }
 impl From<u8> for TailByte {
