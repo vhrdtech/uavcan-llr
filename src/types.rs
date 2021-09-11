@@ -4,10 +4,11 @@ use core::fmt::{Formatter, Display};
 use core::convert::{TryFrom};
 use crate::Error;
 use core::cmp::Ordering;
+use hash32_derive::Hash32;
 
 macro_rules! max_bound_number {
     ($type_name: ident, $base_type: ty, $max: literal) => {
-        #[derive(Copy, Clone, Eq, PartialEq, Debug)]
+        #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash32)]
         pub struct $type_name($base_type);
         impl $type_name {
             pub const fn new(x: $base_type) -> Option<$type_name> {
@@ -147,20 +148,7 @@ impl Into<u32> for CanId {
     fn into(self) -> u32 {
         let source_id = self.source_node_id.inner() as u32;
         let priority = (self.priority as u32) << 26;
-        let bits26_7 = match self.transfer_kind {
-            TransferKind::Message(message) => {
-                let subject_id = (message.subject_id.inner() as u32) << 8;
-                let is_anonymous = (message.is_anonymous as u32) << 24;
-                subject_id | is_anonymous
-            }
-            TransferKind::Service(service) => {
-                let destination_id = (service.destination_node_id.inner() as u32) << 7;
-                let service_id = (service.service_id.inner() as u32) << 14;
-                let is_request = (service.is_request as u32) << 24;
-                let is_service = 1 << 25;
-                destination_id | service_id | is_request | is_service
-            }
-        };
+        let bits26_7 = self.transfer_kind.ser();
         priority | bits26_7 | source_id
     }
 }
@@ -197,6 +185,32 @@ impl TryFrom<vhrdcan::FrameId> for CanId {
 pub enum TransferKind {
     Message(Message),
     Service(Service)
+}
+impl TransferKind {
+    // Used in assembler.rs alongside source id to form a key into key-transfer map.
+    pub(crate) fn ser(&self) -> u32 {
+        match self {
+            TransferKind::Message(message) => {
+                let subject_id = (message.subject_id.inner() as u32) << 8;
+                let is_anonymous = (message.is_anonymous as u32) << 24;
+                subject_id | is_anonymous
+            }
+            TransferKind::Service(service) => {
+                let destination_id = (service.destination_node_id.inner() as u32) << 7;
+                let service_id = (service.service_id.inner() as u32) << 14;
+                let is_request = (service.is_request as u32) << 24;
+                let is_service = 1 << 25;
+                destination_id | service_id | is_request | is_service
+            }
+        }
+    }
+}
+// Hash32 doesn't support enums as of writing this, so u32 is used instead.
+impl hash32::Hash for TransferKind {
+    fn hash<H: hash32::Hasher>(&self, state: &mut H) {
+        let bits26_7 = self.ser().to_le_bytes();
+        state.write(&bits26_7);
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]

@@ -1,7 +1,6 @@
 #[deny(warnings)]
 
 use crate::types::TransferId;
-use core::mem::transmute;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct TailByte {
@@ -67,10 +66,6 @@ impl TailByte {
 
     pub fn as_byte(&self) -> u8 {
         ((self.kind as u8) << 5) | self.id.inner()
-    }
-
-    pub fn kind(&self) -> Kind {
-        Kind::EndT0
     }
 }
 impl From<u8> for TailByte {
