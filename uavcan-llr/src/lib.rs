@@ -1,6 +1,6 @@
-#![cfg_attr(not(test), no_std)]
+// #![cfg_attr(not(test), no_std)]
 // #![feature(const_generics)]
-// #![feature(const_evaluatable_checked)]
+#![feature(generic_const_exprs)]
 // #![allow(incomplete_features)]
 // #![feature(const_option)]
 #[deny(warnings)]

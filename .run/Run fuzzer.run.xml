@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Check" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
-    <option name="command" value="check" />
+  <configuration default="false" name="Run fuzzer" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+    <option name="command" value="run --bin fuzzer" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <option name="channel" value="NIGHTLY" />
     <option name="requiredFeatures" value="true" />

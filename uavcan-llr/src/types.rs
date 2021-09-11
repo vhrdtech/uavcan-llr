@@ -212,11 +212,31 @@ impl hash32::Hash for TransferKind {
         state.write(&bits26_7);
     }
 }
+impl core::fmt::Display for TransferKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TransferKind::Message(message) => {
+                write!(f, "{}", message)
+            }
+            TransferKind::Service(service) => {
+                write!(f, "{}", service)
+            }
+        }
+    }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Message {
     pub subject_id: SubjectId,
     pub is_anonymous: bool,
+}
+impl core::fmt::Display for Message {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        if self.is_anonymous {
+            write!(f, "Anon").ok();
+        }
+        write!(f, "Msg({})", self.subject_id.inner())
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -224,6 +244,16 @@ pub struct Service {
     pub destination_node_id: NodeId,
     pub service_id: ServiceId,
     pub is_request: bool,
+}
+impl core::fmt::Display for Service {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        if self.is_request {
+            write!(f, "Req(").ok();
+        } else {
+            write!(f, "Rep(").ok();
+        }
+        write!(f, "{}) -> {:?}", self.service_id.inner(), self.destination_node_id)
+    }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]

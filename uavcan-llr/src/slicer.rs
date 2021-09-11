@@ -150,8 +150,8 @@ impl<'a, const MTU: usize> Iterator for OwnedSlicer<'a, MTU> {
 }
 impl<'a, const MTU: usize> OwnedSlicer<'a, MTU> {
     #[cfg(feature = "vhrdcan")]
-    pub fn vhrd_raw(self, id: crate::types::CanId) -> VhrdOwnedSlicerRaw<'a, MTU> {
-        VhrdOwnedSlicerRaw {
+    pub fn vhrd(self, id: crate::types::CanId) -> VhrdOwnedSlicer<'a, MTU> {
+        VhrdOwnedSlicer {
             slicer: self,
             id: unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(id.into())) }
         }
@@ -168,12 +168,12 @@ impl<'a, const MTU: usize> OwnedSlicer<'a, MTU> {
 }
 
 #[cfg(feature = "vhrdcan")]
-pub struct VhrdOwnedSlicerRaw<'a, const MTU: usize> {
+pub struct VhrdOwnedSlicer<'a, const MTU: usize> {
     slicer: OwnedSlicer<'a, MTU>,
     id: vhrdcan::FrameId,
 }
 #[cfg(feature = "vhrdcan")]
-impl<'a, const MTU: usize> Iterator for VhrdOwnedSlicerRaw<'a, MTU> {
+impl<'a, const MTU: usize> Iterator for VhrdOwnedSlicer<'a, MTU> {
     type Item = vhrdcan::Frame<MTU>;
 
     fn next(&mut self) -> Option<Self::Item> {
