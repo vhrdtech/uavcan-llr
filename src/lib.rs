@@ -1,9 +1,8 @@
 #![cfg_attr(not(test), no_std)]
-#![feature(const_generics)]
-#![feature(const_evaluatable_checked)]
-#![allow(incomplete_features)]
+// #![feature(const_generics)]
+// #![feature(const_evaluatable_checked)]
+// #![allow(incomplete_features)]
 #[deny(warnings)]
-
 
 pub mod types;
 pub mod slicer;
@@ -26,7 +25,6 @@ mod tests {
     use crate::tailbyte::TailByte;
     use crate::Error;
     use crate::slicer::{Slicer, OwnedSlice, frame_count};
-    use crate::assembler::Assembler;
 
     #[test]
     fn check_ids() {
@@ -78,17 +76,17 @@ mod tests {
 
     #[test]
     fn check_tailbyte() {
-        assert_eq!(TailByte::single_frame_transfer(TransferId::new(10).unwrap()).as_byte(), 0b1110_1010);
-        let mut multi = TailByte::multi_frame_transfer(TransferId::new(7).unwrap(), 0);
+        assert_eq!(TailByte::new_single_frame(TransferId::new(10).unwrap()).as_byte(), 0b1110_1010);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(7).unwrap(), 0);
         assert_eq!(multi.next(), None);
-        let mut multi = TailByte::multi_frame_transfer(TransferId::new(7).unwrap(), 1);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(7).unwrap(), 1);
         assert_eq!(multi.next(), Some(TailByte::from(0b1110_0111)));
         assert_eq!(multi.next(), None);
-        let mut multi = TailByte::multi_frame_transfer(TransferId::new(7).unwrap(), 2);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(7).unwrap(), 2);
         assert_eq!(multi.next(), Some(TailByte::from(0b1010_0111)));
         assert_eq!(multi.next(), Some(TailByte::from(0b0100_0111)));
         assert_eq!(multi.next(), None);
-        let mut multi = TailByte::multi_frame_transfer(TransferId::new(31).unwrap(), 3);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(31).unwrap(), 3);
         assert_eq!(multi.next(), Some(TailByte::from(0b1011_1111)));
         assert_eq!(multi.next(), Some(TailByte::from(0b0001_1111)));
         assert_eq!(multi.next(), Some(TailByte::from(0b0111_1111)));
@@ -106,7 +104,7 @@ mod tests {
         assert_eq!(frame_count(12, 8), 2); // 7+t 5+crc+t
 
         assert_eq!(frame_count(13, 8), 3); // 7+t 6+cr+t c+t
-        assert_eq!(frame_count(14, 8), 3); // 7+t 7+t 2+t
+        assert_eq!(frame_count(14, 8), 3); // 7+t 7+t crc+t
         assert_eq!(frame_count(19, 8), 3); // 7+t 7+t 5+crc+t
 
         assert_eq!(frame_count(20, 8), 4); // 7+t 7+t 6+cr+t c+t
@@ -125,14 +123,66 @@ mod tests {
         assert_eq!(slicer.next(), None);
 
         let payload = [0, 1, 2, 3, 4, 5, 6, 7];
+        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(1).unwrap()).frames_owned();
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0001],
+            used: 8
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [7, 0x17, 0x8d, 0b0100_0001, 0, 0, 0, 0],
+            used: 4,
+        }));
+        assert_eq!(slicer.next(), None);
+
+        let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(2).unwrap()).frames_owned();
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0010],
+            used: 8
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [7, 8, 9, 10, 11, 12, 0xac, 0b0000_0010],
+            used: 8,
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0xdd, 0b0110_0010, 0, 0, 0, 0, 0, 0],
+            used: 2,
+        }));
+        assert_eq!(slicer.next(), None);
+
+        let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(31).unwrap()).frames_owned();
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0, 1, 2, 3, 4, 5, 6, 0b1011_1111],
+            used: 8
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [7, 8, 9, 10, 11, 12, 13, 0b0001_1111],
+            used: 8,
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0x78, 0xcb, 0b0111_1111, 0, 0, 0, 0, 0],
+            used: 3,
+        }));
+        assert_eq!(slicer.next(), None);
+
+        let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
         let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
         assert_eq!(slicer.next(), Some(OwnedSlice {
             bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0000],
             used: 8
         }));
         assert_eq!(slicer.next(), Some(OwnedSlice {
-            bytes: [7, 0x17, 0x8d, 0b0100_0000, 0, 0, 0, 0],
-            used: 4,
+            bytes: [7, 8, 9, 10, 11, 12, 13, 0b0000_0000],
+            used: 8,
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [14, 15, 16, 17, 18, 19, 20, 0b0010_0000],
+            used: 8,
+        }));
+        assert_eq!(slicer.next(), Some(OwnedSlice {
+            bytes: [0xdd, 0x0a, 0b0100_0000, 0, 0, 0, 0, 0],
+            used: 3,
         }));
         assert_eq!(slicer.next(), None);
     }

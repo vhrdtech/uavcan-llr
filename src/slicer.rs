@@ -26,7 +26,7 @@ impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
             crc.copy_from_slice(&crc16);
             2
         };
-        let tail_bytes = crate::tailbyte::TailByte::multi_frame_transfer(
+        let tail_bytes = crate::tailbyte::TailByte::new_multi_frame(
             transfer_id,
             frame_count(payload.len(), MTU)
         );

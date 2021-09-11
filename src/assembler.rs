@@ -82,12 +82,12 @@ impl<const MTU: usize> TransferMachine<MTU> {
                     }
 
                     // Start of a multi-frame transfer from "idle" states, ok
-                    (Kind::Start, Empty | Done | Failure) => {
+                    (Kind::MultiFrame, Empty | Done | Failure) => {
 
                         AssemblingT1
                     }
                     // Repeated start in the middle of a multi-frame transfer, error
-                    (Kind::Start, AssemblingT1 | AssemblingT0) => {
+                    (Kind::MultiFrame, AssemblingT1 | AssemblingT0) => {
 
                         Failure
                     }
@@ -125,7 +125,7 @@ impl<const MTU: usize> TransferMachine<MTU> {
                     }
 
                     // UAVCAN Version 0 tail byte, error
-                    (Kind::SingleFrameV0 | Kind::StartV0, _) => {
+                    (Kind::SingleFrameV0 | Kind::MultiFrameV0, _) => {
 
                         Failure
                     }

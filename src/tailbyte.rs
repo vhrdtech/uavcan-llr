@@ -1,40 +1,63 @@
 #[deny(warnings)]
 
 use crate::types::TransferId;
+use core::mem::transmute;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct TailByte {
-    pub start_of_transfer: bool,
-    pub end_of_transfer: bool,
-    pub toggle_bit: bool,
+    pub kind: Kind,
     pub id: TransferId,
 }
+
+#[repr(u8)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Kind {
-    SingleFrame,
-    SingleFrameV0,
-    Start,
-    StartV0,
-    MiddleT1,
-    MiddleT0,
-    EndT1,
-    EndT0,
+    /// start = 0, end = 0, toggle = 0
+    MiddleT0 = 0b000,
+    /// start = 0, end = 0, toggle = 1
+    MiddleT1 = 0b001,
+    /// start = 0, end = 1, toggle = 0
+    EndT0 = 0b010,
+    /// start = 0, end = 1, toggle = 1
+    EndT1 = 0b011,
+    /// start = 1, end = 0, toggle = 0
+    MultiFrameV0 = 0b100,
+    /// start = 1, end = 0, toggle = 1
+    MultiFrame = 0b101,
+    /// start = 1, end = 1, toggle = 0
+    SingleFrameV0 = 0b110,
+    /// start = 1, end = 1, toggle = 1
+    SingleFrame = 0b111,
 }
+impl From<u8> for Kind {
+    fn from(val: u8) -> Self {
+        use Kind::*;
+        match val & 0b111 {
+            0b000 => MiddleT0,
+            0b001 => MiddleT1,
+            0b010 => EndT0,
+            0b011 => EndT1,
+            0b100 => MultiFrameV0,
+            0b101 => MultiFrame,
+            0b110 => SingleFrameV0,
+            0b111 => SingleFrame,
+            _ => unreachable!()
+        }
+    }
+}
+
 impl TailByte {
-    pub fn single_frame_transfer(id: TransferId) -> TailByte {
+    pub fn new_single_frame(id: TransferId) -> TailByte {
         TailByte {
-            start_of_transfer: true,
-            end_of_transfer: true,
-            toggle_bit: true,
+            kind: Kind::SingleFrame,
             id
         }
     }
 
-    pub fn multi_frame_transfer(id: TransferId, frame_count: usize) -> TailByteIter {
+    pub fn new_multi_frame(id: TransferId, frame_count: usize) -> TailByteIter {
         TailByteIter {
             tail_byte: TailByte {
-                start_of_transfer: true,
-                end_of_transfer: false,
-                toggle_bit: true,
+                kind: if frame_count > 1 { Kind::MultiFrame } else { Kind::SingleFrame },
                 id
             },
             current_frame: 0,
@@ -43,10 +66,7 @@ impl TailByte {
     }
 
     pub fn as_byte(&self) -> u8 {
-        ((self.start_of_transfer as u8) << 7) |
-        ((self.end_of_transfer as u8) << 6) |
-        ((self.toggle_bit as u8) << 5) |
-        self.id.inner()
+        ((self.kind as u8) << 5) | self.id.inner()
     }
 
     pub fn kind(&self) -> Kind {
@@ -56,10 +76,9 @@ impl TailByte {
 impl From<u8> for TailByte {
     fn from(byte: u8) -> Self {
         TailByte {
-            start_of_transfer: byte & (1 << 7) != 0,
-            end_of_transfer: byte & (1 << 6) != 0,
-            toggle_bit: byte & (1 << 5) != 0,
-            id: unsafe { TransferId::new_unchecked(byte & 31) }
+            kind: (byte >> 5).into(),
+            // NOTE: unwrap: TransferId is 5 bits wide, will not fail
+            id: TransferId::new(byte & 0b0001_1111).unwrap()
         }
     }
 }
@@ -81,16 +100,23 @@ impl Iterator for TailByteIter {
         if self.current_frame == self.frame_count {
             None
         } else {
-            if self.current_frame == 1 {
-                self.tail_byte.start_of_transfer = false;
+            if self.current_frame == self.frame_count - 1 && self.tail_byte.kind != Kind::SingleFrame {
+                self.tail_byte.kind = if self.tail_byte.kind == Kind::MiddleT0 {
+                    Kind::EndT1
+                } else {
+                    Kind::EndT0
+                };
+            } else if self.current_frame == 1 {
+                self.tail_byte.kind = Kind::MiddleT0;
+            } else if self.current_frame != 0 {
+                self.tail_byte.kind = if self.tail_byte.kind == Kind::MiddleT0 {
+                    Kind::MiddleT1
+                } else {
+                    Kind::MiddleT0
+                };
             }
-            if self.current_frame == self.frame_count - 1 {
-                self.tail_byte.end_of_transfer = true;
-            }
-            let r = Some(self.tail_byte);
             self.current_frame += 1;
-            self.tail_byte.toggle_bit = !self.tail_byte.toggle_bit;
-            r
+            Some(self.tail_byte)
         }
     }
 }
