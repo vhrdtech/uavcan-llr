@@ -12,8 +12,6 @@ pub(crate) mod types {
     pub(crate) type TransferSeq = i16;
     /// Used to index into frame data
     pub(crate) type PieceByteIdx = u8;
-    /// Used to index into transfer list
-    pub(crate) type TransferIdx = u8;
     /// Used to index array of transfer pieces (incoming frames + index of the next piece)
     pub(crate) type PieceIdx = u16;
 }

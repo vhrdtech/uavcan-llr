@@ -31,7 +31,7 @@ impl<const N: usize, const MAX_PIECES: usize> PiecesStorage<N, MAX_PIECES> {
         let empty_slot_idx = self.find_empty_slot().ok_or(data)?;
         self.items[after_piece_idx as usize] = match self.items[after_piece_idx as usize] {
             Piece::Empty => return Err(data),
-            Piece::Filled(data, next) => Piece::Filled(data, empty_slot_idx),
+            Piece::Filled(data, _) => Piece::Filled(data, empty_slot_idx),
         };
         self.items[empty_slot_idx as usize] = Piece::Filled(data, empty_slot_idx);
         self.used += 1;
@@ -110,7 +110,7 @@ pub(crate) struct PiecesIter<'a, const N: usize, const MAX_PIECES: usize> {
     idx: Option<PieceIdx>,
 }
 impl<'a, const N: usize, const MAX_PIECES: usize> Iterator for PiecesIter<'a, N, MAX_PIECES> {
-    type Item = &'a [u8];
+    type Item = (&'a [u8], bool);
 
     fn next(&mut self) -> Option<Self::Item> {
         let (out, next_idx) = match self.idx {
@@ -118,9 +118,9 @@ impl<'a, const N: usize, const MAX_PIECES: usize> Iterator for PiecesIter<'a, N,
                 Piece::Empty => (None, None),
                 Piece::Filled(data, next_idx) => {
                     if idx == *next_idx {
-                        (Some(&data[..]), None)
+                        (Some((&data[..], true)), None)
                     } else {
-                        (Some(&data[..]), Some(*next_idx))
+                        (Some((&data[..], false)), Some(*next_idx))
                     }
                 }
             },

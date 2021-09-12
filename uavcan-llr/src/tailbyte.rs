@@ -67,6 +67,20 @@ impl TailByte {
     pub fn as_byte(&self) -> u8 {
         ((self.kind as u8) << 5) | self.id.inner()
     }
+
+    pub fn is_multi_frame_middle(&self) -> bool {
+        match self.kind {
+            Kind::MiddleT0 | Kind::MiddleT1 => true,
+            _ => false
+        }
+    }
+
+    pub fn is_multi_frame_end(&self) -> bool {
+        match self.kind {
+            Kind::EndT0 | Kind::EndT1 => true,
+            _ => false
+        }
+    }
 }
 impl From<u8> for TailByte {
     fn from(byte: u8) -> Self {
