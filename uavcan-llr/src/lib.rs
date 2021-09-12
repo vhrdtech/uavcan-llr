@@ -7,8 +7,8 @@
 
 pub mod types;
 pub mod slicer;
-pub mod assembler;
 pub mod tailbyte;
+pub mod assembler;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Error {

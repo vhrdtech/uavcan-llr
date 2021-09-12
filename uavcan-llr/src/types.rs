@@ -7,7 +7,7 @@ use core::cmp::Ordering;
 use hash32_derive::Hash32;
 
 macro_rules! max_bound_number {
-    ($type_name: ident, $base_type: ty, $max: literal) => {
+    ($type_name: ident, $base_type: ty, $max: literal, $fmt: literal) => {
         #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash32)]
         pub struct $type_name($base_type);
         impl $type_name {
@@ -27,13 +27,23 @@ macro_rules! max_bound_number {
                 self.0
             }
         }
+
+        impl core::fmt::Display for $type_name {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                if f.alternate() {
+                    write!(f, "{}", self.0)
+                } else {
+                    write!(f, $fmt, self.0)
+                }
+            }
+        }
     };
 }
 
-max_bound_number!(NodeId, u8, 127);
-max_bound_number!(SubjectId, u16, 8191);
-max_bound_number!(ServiceId, u16, 511);
-max_bound_number!(TransferId, u8, 31);
+max_bound_number!(NodeId, u8, 127, "N:{}");
+max_bound_number!(SubjectId, u16, 8191, "Sub:{}");
+max_bound_number!(ServiceId, u16, 511, "Ser:{}");
+max_bound_number!(TransferId, u8, 31, "Tr:{:02}");
 
 impl TransferId {
     pub fn increment(&mut self) {
@@ -83,7 +93,7 @@ impl CanId {
 }
 impl Display for CanId {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "N{:03} {}->", self.source_node_id.inner(), self.priority).ok();
+        write!(f, "{} {}->", self.source_node_id, self.priority).ok();
         match self.transfer_kind {
             TransferKind::Message(message) => {
                 let t = if message.is_anonymous { 'A' } else { '_' };
@@ -91,7 +101,7 @@ impl Display for CanId {
             }
             TransferKind::Service(service) => {
                 let t = if service.is_request { "Rq" } else { "Rp" };
-                write!(f, "N:{:03} S{}{:03}", service.destination_node_id.inner(), t, service.service_id.inner())
+                write!(f, "{} S{}-{}", service.destination_node_id, service.service_id, t)
             }
         }
     }
@@ -235,7 +245,7 @@ impl core::fmt::Display for Message {
         if self.is_anonymous {
             write!(f, "Anon").ok();
         }
-        write!(f, "Msg({})", self.subject_id.inner())
+        write!(f, "Msg({:#})", self.subject_id)
     }
 }
 
@@ -252,7 +262,7 @@ impl core::fmt::Display for Service {
         } else {
             write!(f, "Rep(").ok();
         }
-        write!(f, "{}) -> {:?}", self.service_id.inner(), self.destination_node_id)
+        write!(f, "{:#}) -> {}", self.service_id, self.destination_node_id)
     }
 }
 
