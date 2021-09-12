@@ -1,6 +1,6 @@
 #[deny(warnings)]
 
-use core::fmt::{Formatter, Display};
+use core::fmt::{Formatter, Display, Result as FmtResult};
 use core::convert::{TryFrom};
 use crate::Error;
 use core::cmp::Ordering;
@@ -28,8 +28,8 @@ macro_rules! max_bound_number {
             }
         }
 
-        impl core::fmt::Display for $type_name {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        impl Display for $type_name {
+            fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
                 if f.alternate() {
                     write!(f, "{}", self.0)
                 } else {

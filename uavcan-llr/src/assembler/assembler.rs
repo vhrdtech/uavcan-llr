@@ -1,6 +1,6 @@
 use crate::tailbyte::{Kind, TailByte};
 use crate::types::{CanId, NodeId, Priority, TransferId, TransferKind};
-use core::fmt::Formatter;
+use core::fmt::{Formatter, Display, Result as FmtResult};
 use heapless::FnvIndexMap;
 use super::storage::{PiecesStorage};
 use super::transfer::{PayloadKind, Transfer, TransfersMapKey, TransferMachineOutput};
@@ -93,7 +93,7 @@ impl<
             Push | CheckCrcAndPush => {
                 if output == CheckCrcAndPush {
                     for chunk in storage.traverse(transfer.first_piece_idx.unwrap()) {
-                        println!("traverse: {:?}", chunk)
+                        // println!("traverse: {:?}", chunk)
                     }
                 }
 

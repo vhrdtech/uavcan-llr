@@ -181,7 +181,7 @@ impl<const MTU: usize> Transfer<MTU>
     }
 }
 impl<const MTU: usize> core::fmt::Display for Transfer<MTU> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{:?} Seq:{} t:{} {} {:?}..={:?}/{}",
                self.priority,
                self.sequence_number,
