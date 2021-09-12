@@ -1,7 +1,5 @@
 use core::fmt::{Formatter, Display, Result as FmtResult};
-
-/// Used to index array of transfer pieces (incoming frames + index of the next piece)
-pub(crate)  type PieceIdx = u16;
+use super::types::*;
 
 #[derive(Copy, Clone)]
 pub(crate)  enum Piece<const N: usize> {
