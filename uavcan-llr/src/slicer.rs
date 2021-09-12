@@ -41,7 +41,7 @@ impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
 
     #[cfg(feature = "vhrdcan")]
     pub fn new_single(payload: OwnedSlice<{MTU - 1}>, can_id: crate::types::CanId, transfer_id: &mut TransferId) -> vhrdcan::Frame<MTU> {
-        let tail_byte = crate::tailbyte::TailByte::single_frame_transfer(*transfer_id);
+        let tail_byte = crate::tailbyte::TailByte::new_single_frame(*transfer_id);
         transfer_id.increment();
         let mut frame_bytes = [0u8; MTU];
         frame_bytes[0..payload.used].copy_from_slice(&payload);
