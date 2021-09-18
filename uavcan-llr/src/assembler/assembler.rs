@@ -8,26 +8,25 @@ use super::types::*;
 
 pub struct Assembler<
     const MTU: usize,
+    const MTU_M1: usize,
     const MAX_PIECES: usize,
     const MAX_TRANSFERS: usize,
     const TRANSFER_LIFETIME: u32,
-> where
-    [u8; MTU - 1]: Sized,
+>
 {
     transfers: FnvIndexMap<TransfersMapKey, Transfer<MTU>, MAX_TRANSFERS>,
-    storage: PiecesStorage<{ MTU - 1 }, MAX_PIECES>,
+    storage: PiecesStorage<MTU_M1, MAX_PIECES>,
     latest_sequence_number: TransferSeq,
     counters: Counters,
 }
 
 impl<
     const MTU: usize,
+    const MTU_M1: usize,
     const MAX_PIECES: usize,
     const MAX_TRANSFERS: usize,
     const TRANSFER_LIFETIME: u32,
-> Assembler<MTU, MAX_PIECES, MAX_TRANSFERS, TRANSFER_LIFETIME>
-    where
-        [u8; MTU - 1]: Sized,
+> Assembler<MTU, MTU_M1, MAX_PIECES, MAX_TRANSFERS, TRANSFER_LIFETIME>
 {
     pub fn new() -> Self {
         Assembler {
@@ -71,8 +70,8 @@ impl<
         }
     }
 
-    fn drive_state_machine(storage: &mut PiecesStorage<{MTU - 1}, MAX_PIECES>, transfer: &mut Transfer<MTU>, payload: &[u8], counters: &mut Counters) -> Result<(), ()> {
-        let mut payload_owned = [0u8; MTU - 1];
+    fn drive_state_machine(storage: &mut PiecesStorage<MTU_M1, MAX_PIECES>, transfer: &mut Transfer<MTU>, payload: &[u8], counters: &mut Counters) -> Result<(), ()> {
+        let mut payload_owned = [0u8; MTU_M1];
         let (payload_kind, tail_byte) = if payload.len() >= 1 && payload.len() <= MTU {
             let tail_byte = Some(TailByte::from(*payload.last().unwrap()));
             if payload.len() == 1 {
@@ -206,12 +205,11 @@ impl<
 
 impl<
     const MTU: usize,
+    const MTU_M1: usize,
     const MAX_PIECES: usize,
     const MAX_TRANSFERS: usize,
     const TRANSFER_LIFETIME: u32,
-> Display for Assembler<MTU, MAX_PIECES, MAX_TRANSFERS, TRANSFER_LIFETIME>
-    where
-        [u8; MTU - 1]: Sized,
+> Display for Assembler<MTU, MTU_M1, MAX_PIECES, MAX_TRANSFERS, TRANSFER_LIFETIME>
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         writeln!(f, "Transfers:").ok();

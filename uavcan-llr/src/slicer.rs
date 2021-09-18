@@ -5,16 +5,16 @@ use core::slice::Chunks;
 use crate::tailbyte::TailByteIter;
 use core::ops::Deref;
 
-pub struct Slicer<'a, const MTU: usize> {
+pub struct Slicer<'a, const MTU: usize, const MTU_M1: usize> {
     chunks: Chunks<'a, u8>,
     crc: [u8; 2],
     crc_bytes_left: u8, // = 2, 1 or 0
     tail_bytes: TailByteIter,
 }
 
-impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
-    pub fn new(payload: &'a[u8], transfer_id: TransferId) -> Slicer<'a, MTU> {
-        let max_chunk_len = MTU - 1;
+impl<'a, 'b, const MTU: usize, const MTU_M1: usize> Slicer<'a, MTU, MTU_M1> {
+    pub fn new(payload: &'a[u8], transfer_id: TransferId) -> Slicer<'a, MTU, MTU_M1> {
+        let max_chunk_len = MTU_M1;
         let chunks = payload.chunks(max_chunk_len);
         let mut crc = [0, 0];
         let crc_bytes_left = if payload.len() <= 7 { // single frame transfers are protected by CAN Bus CRC
@@ -28,7 +28,7 @@ impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
         };
         let tail_bytes = crate::tailbyte::TailByte::new_multi_frame(
             transfer_id,
-            frame_count(payload.len(), MTU)
+            frame_count::<MTU>(payload.len(), MTU)
         );
 
         Slicer {
@@ -40,7 +40,7 @@ impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
     }
 
     #[cfg(feature = "vhrdcan")]
-    pub fn new_single(payload: OwnedSlice<{MTU - 1}>, can_id: crate::types::CanId, transfer_id: &mut TransferId) -> vhrdcan::Frame<MTU> {
+    pub fn new_single(payload: OwnedSlice<MTU_M1>, can_id: crate::types::CanId, transfer_id: &mut TransferId) -> vhrdcan::Frame<MTU> {
         let tail_byte = crate::tailbyte::TailByte::new_single_frame(*transfer_id);
         transfer_id.increment();
         let mut frame_bytes = [0u8; MTU];
@@ -51,21 +51,21 @@ impl<'a, 'b, const MTU: usize> Slicer<'a, MTU> {
         }
     }
 
-    pub fn frames_ref(self) -> RefSlicer<'a, MTU> {
+    pub fn frames_ref(self) -> RefSlicer<'a, MTU, MTU_M1> {
         RefSlicer {
             slicer: self
         }
     }
 
-    pub fn frames_owned(self) -> OwnedSlicer<'a, MTU> {
+    pub fn frames_owned(self) -> OwnedSlicer<'a, MTU, MTU_M1> {
         OwnedSlicer {
             slicer: self.frames_ref()
         }
     }
 }
 
-pub fn frame_count(payload_len: usize, mtu: usize) -> usize {
-    if payload_len <= 7 {
+pub fn frame_count<const MTU: usize>(payload_len: usize, mtu: usize) -> usize {
+    if payload_len < MTU {
         1
     } else {
         let payload_len = payload_len + 2;
@@ -73,11 +73,11 @@ pub fn frame_count(payload_len: usize, mtu: usize) -> usize {
     }
 }
 
-pub struct RefSlicer<'a, const MTU: usize> {
-    slicer: Slicer<'a, MTU>
+pub struct RefSlicer<'a, const MTU: usize, const MTU_M1: usize> {
+    slicer: Slicer<'a, MTU, MTU_M1>
 }
 
-impl<'a, const MTU: usize> Iterator for RefSlicer<'a, MTU> {
+impl<'a, const MTU: usize, const MTU_M1: usize> Iterator for RefSlicer<'a, MTU, MTU_M1> {
     type Item = (&'a [u8], OwnedSlice<3>);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -86,7 +86,7 @@ impl<'a, const MTU: usize> Iterator for RefSlicer<'a, MTU> {
                 let tail_byte = tail_byte.as_byte();
                 match self.slicer.chunks.next() {
                     Some(chunk) => {
-                        if chunk.len() <= MTU - 1 - 2 { // mtu8: len() <= 5 (2 byte crc and tail byte will fit)
+                        if chunk.len() <= MTU_M1 - 2 { // mtu8: len() <= 5 (2 byte crc and tail byte will fit)
                             if self.slicer.crc_bytes_left == 2 {
                                 self.slicer.crc_bytes_left -= 2;
                                 Some((chunk, OwnedSlice::new_three(self.slicer.crc[0], self.slicer.crc[1], tail_byte)))
@@ -96,7 +96,7 @@ impl<'a, const MTU: usize> Iterator for RefSlicer<'a, MTU> {
                             } else { // can only be 2 or 1 bytes of crc left for transmission
                                 unreachable!()
                             }
-                        } else if chunk.len() == MTU - 1 - 1 { // mtu8: len() == 6 (1 byte of crc and tail byte will fit)
+                        } else if chunk.len() == MTU_M1 - 1 { // mtu8: len() == 6 (1 byte of crc and tail byte will fit)
                             if self.slicer.crc_bytes_left == 2 {
                                 self.slicer.crc_bytes_left -= 1;
                                 Some((chunk, OwnedSlice::new_two(self.slicer.crc[0], tail_byte)))
@@ -106,7 +106,7 @@ impl<'a, const MTU: usize> Iterator for RefSlicer<'a, MTU> {
                             } else { // can only be 2 or 1 bytes of crc left for transmission
                                 unreachable!()
                             }
-                        } else if chunk.len() == MTU - 1 { // mtu8: len() == 7 (only tail byte will fit), single frame transfer or full frames from multi frame
+                        } else if chunk.len() == MTU_M1 { // mtu8: len() == 7 (only tail byte will fit), single frame transfer or full frames from multi frame
                             Some((chunk, OwnedSlice::new_one(tail_byte)))
                         } else { // size should be <= max_chunk_len=mtu-1 since we chunk input payload that way
                             unreachable!()
@@ -130,10 +130,10 @@ impl<'a, const MTU: usize> Iterator for RefSlicer<'a, MTU> {
     }
 }
 
-pub struct OwnedSlicer<'a, const MTU: usize> {
-    slicer: RefSlicer<'a, MTU>
+pub struct OwnedSlicer<'a, const MTU: usize, const MTU_M1: usize> {
+    slicer: RefSlicer<'a, MTU, MTU_M1>
 }
-impl<'a, const MTU: usize> Iterator for OwnedSlicer<'a, MTU> {
+impl<'a, const MTU: usize, const MTU_M1: usize> Iterator for OwnedSlicer<'a, MTU, MTU_M1> {
     type Item = OwnedSlice<MTU>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -148,9 +148,9 @@ impl<'a, const MTU: usize> Iterator for OwnedSlicer<'a, MTU> {
         }
     }
 }
-impl<'a, const MTU: usize> OwnedSlicer<'a, MTU> {
+impl<'a, const MTU: usize, const MTU_M1: usize> OwnedSlicer<'a, MTU, MTU_M1> {
     #[cfg(feature = "vhrdcan")]
-    pub fn vhrd(self, id: crate::types::CanId) -> VhrdOwnedSlicer<'a, MTU> {
+    pub fn vhrd(self, id: crate::types::CanId) -> VhrdOwnedSlicer<'a, MTU, MTU_M1> {
         VhrdOwnedSlicer {
             slicer: self,
             id: unsafe { vhrdcan::FrameId::Extended(vhrdcan::id::ExtendedId::new_unchecked(id.into())) }
@@ -168,12 +168,12 @@ impl<'a, const MTU: usize> OwnedSlicer<'a, MTU> {
 }
 
 #[cfg(feature = "vhrdcan")]
-pub struct VhrdOwnedSlicer<'a, const MTU: usize> {
-    slicer: OwnedSlicer<'a, MTU>,
+pub struct VhrdOwnedSlicer<'a, const MTU: usize, const MTU_M1: usize> {
+    slicer: OwnedSlicer<'a, MTU, MTU_M1>,
     id: vhrdcan::FrameId,
 }
 #[cfg(feature = "vhrdcan")]
-impl<'a, const MTU: usize> Iterator for VhrdOwnedSlicer<'a, MTU> {
+impl<'a, const MTU: usize, const MTU_M1: usize> Iterator for VhrdOwnedSlicer<'a, MTU, MTU_M1> {
     type Item = vhrdcan::Frame<MTU>;
 
     fn next(&mut self) -> Option<Self::Item> {

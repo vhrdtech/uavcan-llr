@@ -1,8 +1,4 @@
 #![cfg_attr(not(test), no_std)]
-// #![feature(const_generics)]
-#![feature(generic_const_exprs)]
-#![allow(incomplete_features)]
-// #![feature(const_option)]
 #[deny(warnings)]
 
 pub mod types;
@@ -113,27 +109,27 @@ mod tests {
 
     #[test]
     fn check_frame_count() {
-        assert_eq!(frame_count(0, 8), 1);
-        assert_eq!(frame_count(1, 8), 1);
-        assert_eq!(frame_count(6, 8), 1);
-        assert_eq!(frame_count(7, 8), 1);
+        assert_eq!(frame_count::<8>(0, 8), 1);
+        assert_eq!(frame_count::<8>(1, 8), 1);
+        assert_eq!(frame_count::<8>(6, 8), 1);
+        assert_eq!(frame_count::<8>(7, 8), 1);
 
-        assert_eq!(frame_count(8, 8), 2);  // 7+t 1+crc+t
-        assert_eq!(frame_count(12, 8), 2); // 7+t 5+crc+t
+        assert_eq!(frame_count::<8>(8, 8), 2);  // 7+t 1+crc+t
+        assert_eq!(frame_count::<8>(12, 8), 2); // 7+t 5+crc+t
 
-        assert_eq!(frame_count(13, 8), 3); // 7+t 6+cr+t c+t
-        assert_eq!(frame_count(14, 8), 3); // 7+t 7+t crc+t
-        assert_eq!(frame_count(19, 8), 3); // 7+t 7+t 5+crc+t
+        assert_eq!(frame_count::<8>(13, 8), 3); // 7+t 6+cr+t c+t
+        assert_eq!(frame_count::<8>(14, 8), 3); // 7+t 7+t crc+t
+        assert_eq!(frame_count::<8>(19, 8), 3); // 7+t 7+t 5+crc+t
 
-        assert_eq!(frame_count(20, 8), 4); // 7+t 7+t 6+cr+t c+t
-        assert_eq!(frame_count(21, 8), 4); // 7+t 7+t 7+t crc+t
-        assert_eq!(frame_count(26, 8), 4); // 7+t 7+t 7+t 5+crc+t
+        assert_eq!(frame_count::<8>(20, 8), 4); // 7+t 7+t 6+cr+t c+t
+        assert_eq!(frame_count::<8>(21, 8), 4); // 7+t 7+t 7+t crc+t
+        assert_eq!(frame_count::<8>(26, 8), 4); // 7+t 7+t 7+t 5+crc+t
     }
 
     #[test]
     fn check_slicer() {
         let payload = [0, 1, 2, 3, 4, 5, 6];
-        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
         assert_eq!(slicer.next(), Some(OwnedSlice {
             bytes: [0, 1, 2, 3, 4, 5, 6, 0b1110_0000],
             used: 8
@@ -141,7 +137,7 @@ mod tests {
         assert_eq!(slicer.next(), None);
 
         let payload = [0, 1, 2, 3, 4, 5, 6, 7];
-        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(1).unwrap()).frames_owned();
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(1).unwrap()).frames_owned();
         assert_eq!(slicer.next(), Some(OwnedSlice {
             bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0001],
             used: 8
@@ -153,7 +149,7 @@ mod tests {
         assert_eq!(slicer.next(), None);
 
         let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(2).unwrap()).frames_owned();
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(2).unwrap()).frames_owned();
         assert_eq!(slicer.next(), Some(OwnedSlice {
             bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0010],
             used: 8
@@ -169,7 +165,7 @@ mod tests {
         assert_eq!(slicer.next(), None);
 
         let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(31).unwrap()).frames_owned();
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(31).unwrap()).frames_owned();
         assert_eq!(slicer.next(), Some(OwnedSlice {
             bytes: [0, 1, 2, 3, 4, 5, 6, 0b1011_1111],
             used: 8
@@ -185,7 +181,7 @@ mod tests {
         assert_eq!(slicer.next(), None);
 
         let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
         assert_eq!(slicer.next(), Some(OwnedSlice {
             bytes: [0, 1, 2, 3, 4, 5, 6, 0b1010_0000],
             used: 8
@@ -208,7 +204,7 @@ mod tests {
     #[test]
     fn check_assembler() {
         let payload = [0, 1, 2, 3, 4, 5, 6];
-        let mut slicer = Slicer::<8>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
         let transfer_bytes = slicer.next().unwrap();
 
         // let mut assembler = Assembler::<8, 128, 8>::new();
