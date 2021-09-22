@@ -1,10 +1,11 @@
 use crate::tailbyte::{TailByte};
-use crate::types::{CanId};
+use crate::types::{CanId, NodeId, TransferKind, Priority};
 use core::fmt::{Formatter, Display, Result as FmtResult};
 use heapless::FnvIndexMap;
 use super::storage::{PiecesStorage};
 use super::transfer::{PayloadKind, Transfer, TransfersMapKey, TransferMachineOutput};
 use super::types::*;
+use crate::assembler::transfer::State;
 
 pub struct Assembler<
     const MTU: usize,
@@ -14,10 +15,10 @@ pub struct Assembler<
     const TRANSFER_LIFETIME: u32,
 >
 {
-    transfers: FnvIndexMap<TransfersMapKey, Transfer<MTU>, MAX_TRANSFERS>,
-    storage: PiecesStorage<MTU_M1, MAX_PIECES>,
-    latest_sequence_number: TransferSeq,
-    counters: Counters,
+    pub(crate) transfers: FnvIndexMap<TransfersMapKey, Transfer<MTU>, MAX_TRANSFERS>,
+    pub(crate) storage: PiecesStorage<MTU_M1, MAX_PIECES>,
+    pub(crate) latest_sequence_number: TransferSeq,
+    pub(crate) counters: Counters,
 }
 
 impl<
@@ -59,6 +60,7 @@ impl<
             Some(t) => t,
             _ => unreachable!(),
         };
+        transfer.last_changed_timestamp = time_now;
 
         match Self::drive_state_machine(&mut self.storage, transfer, payload, &mut self.counters) {
             Ok(_) => {
@@ -164,6 +166,7 @@ impl<
             }
             Drop => {
                 transfer.first_piece_idx.map(|idx| storage.remove_all(idx));
+                counters.dropped_frames += 1;
                 // self.first_piece_idx = None;
                 // self.last_piece_idx = None;
             }
@@ -201,6 +204,62 @@ impl<
             }
         }
     }
+
+    fn highest_priority_ready_transfer(&self) -> Option<TransfersMapKey> {
+        let mut highest: Option<(TransfersMapKey, Priority, TransferSeq)> = None;
+        for (key, transfer) in &self.transfers {
+            if transfer.transfer_machine.state != State::Done {
+                continue;
+            }
+            highest = match highest {
+                Some((highest_key, highest_priority, highest_seq_number)) => {
+                    if transfer.priority > highest_priority {
+                        Some((*key, transfer.priority, transfer.sequence_number))
+                    } else if transfer.priority == highest_priority &&
+                        transfer.sequence_number.wrapping_sub(highest_seq_number) < 0 {
+                        Some((*key, transfer.priority, transfer.sequence_number))
+                    } else {
+                        Some((highest_key, highest_priority, highest_seq_number))
+                    }
+                },
+                None => {
+                    Some((*key, transfer.priority, transfer.sequence_number))
+                }
+            };
+        }
+        highest.map(|(key, _, _)| key)
+    }
+
+    pub fn pop<'a>(&mut self, assembly_buffer: &'a mut[u8]) -> Option<ReadyTransfer<'a>> {
+        self.highest_priority_ready_transfer().map(move |h| {
+            let transfer = self.transfers.get_mut(&h).expect("");
+            let payload_len = if let Some(idx) = transfer.first_piece_idx {
+                let mut buf_idx = 0;
+                for (chunk, _) in self.storage.traverse(idx) {
+                    assembly_buffer[buf_idx..buf_idx + chunk.len()].copy_from_slice(chunk);
+                    buf_idx += chunk.len();
+                }
+                buf_idx
+            } else {
+                0
+            };
+            let priority = transfer.priority;
+            self.transfers.remove(&h);
+            ReadyTransfer {
+                source: h.source,
+                kind: h.kind,
+                priority,
+                payload: &assembly_buffer[..payload_len]
+            }
+        })
+    }
+}
+
+pub struct ReadyTransfer<'a> {
+    pub source: NodeId,
+    pub kind: TransferKind,
+    pub priority: Priority,
+    pub payload: &'a [u8],
 }
 
 impl<
@@ -236,5 +295,39 @@ impl<
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Counters {
     pub transfers_with_good_crc: usize,
+    pub single_frame_transfers: usize,
     pub transfers_with_bad_crc: usize,
+    pub dropped_frames: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use crate::types::*;
+    use crate::slicer::{Slicer};
+    use crate::assembler::Assembler;
+
+    #[test]
+    fn check_assembler() {
+        let payload = [0, 1, 2, 3, 4, 5, 6];
+        let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
+        let transfer_bytes = slicer.next().unwrap();
+
+        let mut assembler = Assembler::<8, 7, 128, 8, 10>::new();
+        let id = CanId::new_message_kind(NodeId::new(3).unwrap(), SubjectId::new(7).unwrap(), false, Priority::Nominal);
+        assembler.process_frame(id, &transfer_bytes, 0);
+        assert_eq!(assembler.transfers.len(), 1);
+
+        let mut buffer = [0u8; 512];
+        let transfer = assembler.pop(&mut buffer);
+        assert!(transfer.is_some());
+        let transfer = transfer.unwrap();
+        assert_eq!(transfer.source, NodeId::new(3).unwrap());
+        assert_eq!(transfer.kind, TransferKind::Message(Message {
+            subject_id: SubjectId::new(7).unwrap(),
+            is_anonymous: false
+        }));
+        assert_eq!(transfer.payload, &[0, 1, 2, 3, 4, 5, 6]);
+        assert!(assembler.pop(&mut buffer).is_none());
+    }
 }

@@ -7,8 +7,8 @@ use super::types::*;
 
 #[derive(Copy, Clone)]
 pub(crate) struct TransferMachine<const MTU: usize> {
-    state: State,
-    transfer_id: Option<TransferId>,
+    pub(crate) state: State,
+    pub(crate) transfer_id: Option<TransferId>,
 }
 impl<const MTU: usize> Display for TransferMachine<MTU> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
@@ -19,7 +19,7 @@ impl<const MTU: usize> Display for TransferMachine<MTU> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum State {
     Empty,
     AssemblingT1,
