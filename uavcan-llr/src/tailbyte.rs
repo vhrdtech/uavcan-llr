@@ -129,3 +129,29 @@ impl Iterator for TailByteIter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use crate::types::*;
+    use crate::tailbyte::TailByte;
+
+    #[test]
+    fn check_tailbyte() {
+        assert_eq!(TailByte::new_single_frame(TransferId::new(10).unwrap()).as_byte(), 0b1110_1010);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(7).unwrap(), 0);
+        assert_eq!(multi.next(), None);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(7).unwrap(), 1);
+        assert_eq!(multi.next(), Some(TailByte::from(0b1110_0111)));
+        assert_eq!(multi.next(), None);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(7).unwrap(), 2);
+        assert_eq!(multi.next(), Some(TailByte::from(0b1010_0111)));
+        assert_eq!(multi.next(), Some(TailByte::from(0b0100_0111)));
+        assert_eq!(multi.next(), None);
+        let mut multi = TailByte::new_multi_frame(TransferId::new(31).unwrap(), 3);
+        assert_eq!(multi.next(), Some(TailByte::from(0b1011_1111)));
+        assert_eq!(multi.next(), Some(TailByte::from(0b0001_1111)));
+        assert_eq!(multi.next(), Some(TailByte::from(0b0111_1111)));
+        assert_eq!(multi.next(), None);
+    }
+}
