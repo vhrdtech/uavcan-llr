@@ -308,7 +308,7 @@ mod tests {
     use crate::assembler::Assembler;
 
     #[test]
-    fn check_assembler() {
+    fn check_single_frame() {
         let payload = [0, 1, 2, 3, 4, 5, 6];
         let mut slicer = Slicer::<8, 7>::new(&payload, TransferId::new(0).unwrap()).frames_owned();
         let transfer_bytes = slicer.next().unwrap();
@@ -329,5 +329,10 @@ mod tests {
         }));
         assert_eq!(transfer.payload, &[0, 1, 2, 3, 4, 5, 6]);
         assert!(assembler.pop(&mut buffer).is_none());
+    }
+
+    #[test]
+    fn check_multi_frame() {
+        let payload = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     }
 }
